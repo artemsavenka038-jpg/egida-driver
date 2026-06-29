@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Fletera · Водитель — Egida-Trans</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#07090f; --bg2:#0b1018; --bg3:#11182400; --card:#0e1521; --border:#1a2436; --border2:#26344d;
+    --text:#e9eff8; --text2:#9fb0c8; --text3:#5b6c87; --accent:#4f8cff; --accent2:#22d3ee; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:Manrope,system-ui,Arial,sans-serif;
+    background-image:radial-gradient(900px 500px at 50% -10%, rgba(79,140,255,.10), transparent 60%);}
+  .wrap{max-width:480px; margin:0 auto; padding:16px 14px 40px;}
+  .brand{display:flex; align-items:center; gap:10px; justify-content:center; margin:8px 0 18px;}
+  .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 6px 20px rgba(79,140,255,.35);}
+  .wm{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:22px;letter-spacing:-.5px;}
+  .wm small{display:block;font-family:Manrope;font-weight:600;font-size:10px;letter-spacing:1px;color:var(--text3);}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px;
+    box-shadow:0 8px 28px rgba(0,0,0,.35);}
+  .lbl{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:7px;}
+  .inp{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:14px;
+    color:var(--text);font-size:22px;text-align:center;letter-spacing:6px;font-weight:800;font-family:inherit;}
+  .btn{width:100%;border:none;border-radius:13px;padding:15px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;
+    font-family:inherit;background:linear-gradient(135deg,var(--accent),var(--accent2));}
+  .btn:disabled{opacity:.55;}
+  .sbtn{width:100%;border-radius:13px;padding:15px 16px;font-size:15.5px;font-weight:800;cursor:pointer;text-align:left;
+    font-family:inherit;display:flex;align-items:center;gap:12px;transition:transform .1s ease, filter .12s ease;}
+  .sbtn:active{transform:scale(.985);}
+  .sbtn .dot{width:11px;height:11px;border-radius:999px;flex-shrink:0;}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:999px;font-weight:800;font-size:12.5px;}
+  .row{font-size:13.5px;color:var(--text2);margin:3px 0;line-height:1.5;}
+  .row b{color:var(--text);}
+  .muted{color:var(--text3);font-size:11.5px;}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0e1c12;border:1px solid #1f7a3f;
+    color:#86efac;padding:11px 18px;border-radius:12px;font-weight:700;font-size:13.5px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .center{min-height:60vh;display:flex;align-items:center;justify-content:center;color:var(--text3);}
+  .link{background:none;border:none;color:var(--text3);font-size:12.5px;text-decoration:underline;cursor:pointer;font-family:inherit;}
+  .err{color:#fca5a5;font-size:12.5px;margin-top:8px;text-align:center;}
+  .msgbox{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;
+    padding:11px 12px;white-space:pre-wrap;font-size:13px;color:var(--text2);line-height:1.55;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script>
+/* ===== Fletera driver app — same Firebase base as dispatcher (egida-transapp) ===== */
+var DB_URL = "https://egida-transapp-default-rtdb.europe-west1.firebasedatabase.app";
+function dbGet(p){ return fetch(DB_URL+p+".json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}); }
+function dbPatch(p,d){ return fetch(DB_URL+p+".json",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}); }
+
+var h = React.createElement;
+var useState = React.useState, useEffect = React.useEffect, useRef = React.useRef;
+
+function nowISO(){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+function fmt(s){ if(!s) return ""; var d=new Date(s); if(isNaN(d)) return s;
+  return d.toLocaleDateString('ru',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}); }
+function findKey(data,code){ if(!data) return null; var ks=Object.keys(data);
+  for(var i=0;i<ks.length;i++){ var t=data[ks[i]]; if(t && String(t.pin)===String(code).trim()) return ks[i]; } return null; }
+
+/* driver events -> statuses the dispatcher understands (so it shows proper labels) */
+var STATUSES = [
+  { key:'at_load',        label:'Выехал на загрузку',     status:'AT_LOAD',        color:'#f59e0b' },
+  { key:'arrived_load',   label:'Приехал на загрузку',    status:'ARRIVED_LOAD',   color:'#f59e0b' },
+  { key:'loading',        label:'Начали грузить',         status:'LOADING',        color:'#fb923c' },
+  { key:'loaded',         label:'Загрузился',             status:'LOADED',         color:'#22c55e' },
+  { key:'to_unload',      label:'Выехал на выгрузку',     status:'AT_UNLOAD',      color:'#a78bfa' },
+  { key:'arrived_unload', label:'Приехал на выгрузку',    status:'ARRIVED_UNLOAD', color:'#a78bfa' },
+  { key:'unloaded',       label:'Выгрузился',             status:'UNLOADED',       color:'#22c55e' },
+  { key:'to_back',        label:'Выехал за обраткой',     status:'BACK_GO',        color:'#06b6d4' },
+  { key:'back_loaded',    label:'Загрузил обратный груз', status:'BACK',           color:'#06b6d4' },
+  { key:'done',           label:'Завершил рейс (свободен)', status:'FREE',         color:'#22c55e' },
+  { key:'problem',        label:'Проблема!',              status:'PROBLEM',        color:'#ef4444' }
+];
+var ST_LABELS = { FREE:'Свободна', FORWARD:'В рейсе', LOADED:'Загружен', BACK:'Обратный',
+  AT_LOAD:'Едет на загрузку', ARRIVED_LOAD:'На загрузке', LOADING:'Грузится',
+  AT_UNLOAD:'Едет на выгрузку', ARRIVED_UNLOAD:'На выгрузке', UNLOADED:'Выгрузился',
+  BACK_GO:'За обраткой', PROBLEM:'Проблема', SERVICE:'Сервис' };
+var ST_COLORS = { FREE:'#34d399', FORWARD:'#4f8cff', LOADED:'#34d399', BACK:'#22d3ee',
+  AT_LOAD:'#f59e0b', ARRIVED_LOAD:'#f59e0b', LOADING:'#fb923c', AT_UNLOAD:'#a78bfa',
+  ARRIVED_UNLOAD:'#a78bfa', UNLOADED:'#34d399', BACK_GO:'#22d3ee', PROBLEM:'#ef4444', SERVICE:'#fb923c' };
+
+function Brand(){
+  return h('div',{className:'brand'},
+    h('div',{className:'logo'},'🚚'),
+    h('div',{className:'wm'}, 'Fle', h('span',{style:{color:'#22d3ee'}},'tera'),
+      h('small',null,'ВОДИТЕЛЬ · Egida-Trans')));
+}
+
+function Login(props){
+  var st=useState(''); var code=st[0], setCode=st[1];
+  var es=useState(''); var err=es[0], setErr=es[1];
+  var bs=useState(false); var busy=bs[0], setBusy=bs[1];
+  function go(){
+    var c=(code||'').trim(); if(!c) return;
+    setBusy(true); setErr('');
+    dbGet('/trucks').then(function(d){
+      setBusy(false);
+      var k=findKey(d,c);
+      if(k) props.onFound(k); else setErr('Неверный код. Спросите у диспетчера.');
+    }).catch(function(){ setBusy(false); setErr('Нет связи с сервером. Проверьте интернет.'); });
+  }
+  return h('div',{className:'wrap'},
+    h(Brand,null),
+    h('div',{className:'card'},
+      h('div',{className:'lbl',style:{textAlign:'center'}},'Введите ваш код'),
+      h('input',{className:'inp',inputMode:'numeric',placeholder:'0000',value:code,
+        onChange:function(e){setCode(e.target.value);},
+        onKeyDown:function(e){if(e.key==='Enter')go();},autoFocus:true}),
+      err?h('div',{className:'err'},err):null,
+      h('div',{style:{height:14}}),
+      h('button',{className:'btn',disabled:busy,onClick:go}, busy?'Проверяю…':'Войти'),
+      h('div',{style:{marginTop:14,textAlign:'center'}},
+        h('div',{className:'muted'},'Код выдаёт диспетчер. Он же приходит в сообщении со ссылкой.'))));
+}
+
+function stripMoney(s){
+  if(!s) return s;
+  var NL=String.fromCharCode(10);
+  var out=String(s).split(NL).map(function(ln){
+    var L=ln;
+    L=L.replace(/(?:ставк|тариф|прайс|стоимост|цен[ауыео]|оплат|сумм)[а-яё]*[^\d\n]{0,8}\d[\d\s.,]*\s*(?:руб(?:\.|лей|ля)?|₽|byn|rub|бел[\s.]*руб)?(?![а-яёa-zА-ЯЁA-Z])/gi,'');
+    L=L.replace(/\d[\d\s.,]*\s*(?:руб(?:\.|лей|ля)?|₽|byn|rub|бел[\s.]*руб)(?![а-яёa-zА-ЯЁA-Z])/gi,'');
+    L=L.replace(/\s*₽/g,'');
+    L=L.replace(/[ \t]{2,}/g,' ').replace(/^[ \t]*[,;:\-—=]+[ \t]*/,'').replace(/[ \t]+([,;.])/g,'$1').replace(/[ \t]+$/,'');
+    return L;
+  }).filter(function(l){ return l.trim()!==''; }).join(NL);
+  return out.trim();
+}
+function DriverPage(props){
+  var key=props.truckKey;
+  var ts=useState(null); var truck=ts[0], setTruck=ts[1];
+  var ls=useState(false); var loaded=ls[0], setLoaded=ls[1];
+  var ss=useState(''); var sending=ss[0], setSending=ss[1];
+  var os=useState(''); var toast=os[0], setToast=os[1];
+  var gs=useState({}); var cfg=gs[0], setCfg=gs[1];
+  var tb=useState('trip'); var tab=tb[0], setTab=tb[1];
+  var ch=useState([]); var chat=ch[0], setChat=ch[1];
+  var ci=useState(''); var cmsg=ci[0], setCmsg=ci[1];
+  var cs=useState(false); var csend=cs[0], setCsend=cs[1];
+  var sv=useState(function(){ try{return localStorage.getItem('egida_chat_seen')||'';}catch(e){return '';} }); var seen=sv[0], setSeen=sv[1];
+  var endRef=useRef(null);
+  function loadChat(){ return dbGet('/chat/messages').then(function(o){ if(!o){ setChat([]); return; } var arr=Object.keys(o).map(function(k){return o[k];}).filter(Boolean).sort(function(a,b){return (a.ts||'')<(b.ts||'')?-1:1;}); setChat(arr.slice(-80)); }); }
+  useEffect(function(){ loadChat(); var iv=setInterval(loadChat,8000); return function(){ clearInterval(iv); }; },[]);
+  useEffect(function(){ if(endRef.current && endRef.current.scrollIntoView){ endRef.current.scrollIntoView({block:'end'}); } },[chat,tab]);
+  useEffect(function(){ if(tab==='chat' && chat.length){ var last=chat[chat.length-1].ts||''; setSeen(last); try{localStorage.setItem('egida_chat_seen',last);}catch(e){} } },[tab,chat]);
+  var myPlate=(truck&&truck.plate)||'';
+  var unseen=chat.filter(function(m){ return (m.ts||'')>seen && !(m.from==='driver'&&m.plate===myPlate); }).length;
+  function pushMsg(extra){ if(!truck) return; var id=String(Date.now())+Math.random().toString(36).slice(2,6);
+    var msg=Object.assign({from:'driver',name:truck.driver||'Водитель',plate:truck.plate||'',ts:nowISO()},extra);
+    setCsend(true);
+    var patch={}; patch['messages/'+id]=msg; patch['last']={ts:msg.ts,from:'driver',name:msg.name};
+    dbPatch('/chat',patch).then(function(){ setCmsg(''); return loadChat(); }).then(function(){ setCsend(false); }).catch(function(){ setCsend(false); });
+  }
+  function sendText(){ var t=(cmsg||'').trim(); if(!t) return; pushMsg({text:t}); }
+  function sendGeo(){ if(!navigator.geolocation){ setToast('Геолокация недоступна'); return; }
+    setToast('Получаю геолокацию…');
+    navigator.geolocation.getCurrentPosition(function(pos){ var la=Number(pos.coords.latitude.toFixed(5)), ln=Number(pos.coords.longitude.toFixed(5));
+      pushMsg({text:'📍 Моя геолокация', geo:{lat:la,lng:ln}}); setToast('Геолокация отправлена'); },
+      function(){ setToast('Не удалось получить геолокацию (нет доступа)'); }, {enableHighAccuracy:true,timeout:10000,maximumAge:0});
+  }
+  function renderTabs(){
+    function tabBtn(id,label,dot){ var on=tab===id;
+      return h('button',{onClick:function(){ setTab(id); },style:{flex:1,padding:'11px',borderRadius:11,border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:14,position:'relative',
+        background:on?'linear-gradient(135deg,#4f8cff,#22d3ee)':'rgba(255,255,255,.06)',color:on?'#06121f':'#9fb0c8'}},label,
+        dot?h('span',{style:{position:'absolute',top:7,right:10,minWidth:8,height:8,borderRadius:8,background:'#ef4444'}}):null); }
+    return h('div',{style:{display:'flex',gap:8,marginBottom:12}}, tabBtn('trip','🚛 Рейс',false), tabBtn('chat','💬 Чат водителей',unseen>0)); }
+  function renderChat(){
+    return h('div',{className:'card',style:{display:'flex',flexDirection:'column',height:'70vh',padding:0,overflow:'hidden'}},
+      h('div',{style:{padding:'11px 13px',borderBottom:'1px solid rgba(255,255,255,.08)'}},
+        h('div',{style:{fontWeight:800,fontSize:14}},'💬 Чат водителей'),
+        h('div',{style:{fontSize:11,color:'#7e8ba3',marginTop:2}},'Видят все водители и диспетчер')),
+      h('div',{style:{flex:1,overflowY:'auto',padding:'12px 13px',display:'flex',flexDirection:'column',gap:9}},
+        chat.length===0?h('div',{style:{color:'#7e8ba3',textAlign:'center',marginTop:20,fontSize:13}},'Сообщений пока нет. Напишите первым — кто куда едет, по документам и т.д.'):
+        chat.map(function(m,i){ var mine=(m.from==='driver'&&m.plate===myPlate); var office=(m.from==='office');
+          return h('div',{key:i,style:{alignSelf:mine?'flex-end':'flex-start',maxWidth:'85%'}},
+            h('div',{style:{fontSize:10.5,color:office?'#22d3ee':'#7e8ba3',fontWeight:700,marginBottom:2,textAlign:mine?'right':'left'}},
+              mine?'Вы':((office?'🏢 ':'')+(m.name||'—')+((m.plate&&!office)?(' · '+m.plate):''))),
+            h('div',{style:{padding:'8px 11px',borderRadius:13,fontSize:13.5,lineHeight:1.4,whiteSpace:'pre-wrap',
+              background:mine?'#2563eb':(office?'rgba(34,211,238,.16)':'rgba(255,255,255,.07)'),color:mine?'#fff':'#e8eefb',
+              borderTopRightRadius:mine?4:13,borderTopLeftRadius:mine?13:4}},
+              (m.text||''),
+              m.geo?h('div',{style:{marginTop:6}},h('a',{href:'https://maps.google.com/?q='+m.geo.lat+','+m.geo.lng,target:'_blank',rel:'noopener',
+                style:{color:mine?'#cfe0ff':'#22d3ee',fontWeight:700,textDecoration:'underline',fontSize:12.5}},'🗺 Открыть на карте')):null),
+            h('div',{style:{fontSize:9.5,color:'#5a6678',marginTop:2,textAlign:mine?'right':'left'}}, m.ts?fmt(m.ts):'')); }),
+        h('div',{ref:endRef})),
+      h('div',{style:{display:'flex',gap:8,padding:'10px 11px',borderTop:'1px solid rgba(255,255,255,.08)',alignItems:'flex-end'}},
+        h('button',{onClick:sendGeo,title:'Отправить геолокацию',style:{flexShrink:0,width:44,height:44,borderRadius:11,border:'1px solid rgba(34,211,238,.5)',background:'rgba(34,211,238,.14)',color:'#22d3ee',fontSize:18,cursor:'pointer'}},'📍'),
+        h('textarea',{value:cmsg,onChange:function(e){ setCmsg(e.target.value); },placeholder:'Сообщение…',rows:1,
+          onKeyDown:function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendText(); } },
+          style:{flex:1,resize:'none',background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.12)',borderRadius:11,padding:'11px 12px',color:'#e8eefb',fontSize:14,fontFamily:'inherit',maxHeight:120}}),
+        h('button',{onClick:sendText,disabled:csend,style:{flexShrink:0,height:44,padding:'0 16px',borderRadius:11,border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:16,background:'linear-gradient(135deg,#4f8cff,#22d3ee)',color:'#06121f',opacity:csend?.6:1}},'➤'))); }
+
+  function load(){ return dbGet('/trucks/'+key).then(function(t){ setTruck(t||null); setLoaded(true); }); }
+  useEffect(function(){ load(); },[key]);
+  useEffect(function(){ var iv=setInterval(function(){ dbGet('/trucks/'+key).then(function(t){ if(t) setTruck(t); }); },15000);
+    return function(){ clearInterval(iv); }; },[key]);
+  useEffect(function(){ dbGet('/settings').then(function(x){ if(x) setCfg(x); }).catch(function(){}); },[]);
+
+  function mark(s){
+    setSending(s.key);
+    var patch = (s.key==='problem')
+      ? { problem:true, lastEvent:s.label, lastTime:nowISO(), driverKey:s.key }
+      : { status:s.status, problem:false, lastEvent:s.label, lastTime:nowISO(), driverKey:s.key };
+    dbPatch('/trucks/'+key, patch)
+      .then(function(){ setToast('Отправлено: '+s.label); return load(); })
+      .then(function(){ setSending(''); setTimeout(function(){ setToast(''); },2600); })
+      .catch(function(){ setSending(''); setToast('Ошибка связи — попробуйте ещё раз'); setTimeout(function(){ setToast(''); },2600); });
+  }
+
+  if(!loaded) return h('div',{className:'center'},'Загрузка…');
+  if(!truck) return h('div',{className:'wrap'}, h(Brand,null),
+    h('div',{className:'card'}, h('div',{className:'row'},'Машина не найдена. Попросите у диспетчера новый код.'),
+      h('div',{style:{height:12}}), h('button',{className:'link',onClick:props.onExit},'← Ввести другой код')));
+
+  var stColor = ST_COLORS[truck.status] || '#5b6c87';
+  var stLabel = ST_LABELS[truck.status] || truck.status || '—';
+  var bc = truck.backCargo;
+
+  return h('div',{className:'wrap'},
+    h(Brand,null),
+    renderTabs(),
+    tab==='chat' ? renderChat() : h('div',null,
+    // current status + truck
+    h('div',{className:'card'},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:6}},
+        h('div',{style:{fontWeight:800,fontSize:18}}, truck.plate||'—'),
+        h('span',{className:'pill',style:{background:'rgba(127,127,127,.12)',border:'1px solid '+stColor+'66',color:stColor}},
+          h('span',{className:'dot',style:{background:stColor}}), stLabel)),
+      h('div',{className:'row'}, '👤 ', h('b',null, truck.driver||'—')),
+      truck.lastEvent?h('div',{className:'muted',style:{marginTop:4}},'Последняя отметка: '+truck.lastEvent+(truck.lastTime?(' · '+fmt(truck.lastTime)):'')):null,
+      truck.problem?h('div',{style:{marginTop:8,padding:'9px 11px',borderRadius:10,background:'rgba(239,68,68,.14)',border:'1px solid rgba(239,68,68,.5)',color:'#ef4444',fontWeight:800,fontSize:13,lineHeight:1.4}},'⚠ Проблема отмечена — диспетчер уведомлён. Когда продолжите рейс, нажмите нужный статус.'):null),
+
+    // task
+    (truck.clientName||truck.driverMsg)?h('div',{className:'card'},
+      h('div',{className:'lbl'},'Текущее задание'),
+      truck.clientName?h('div',{className:'row'},'🏢 ', h('b',null,truck.clientName)):null,
+      stripMoney(truck.driverMsg||'')?h('div',{style:{marginTop:9}}, h('div',{className:'lbl'},'Сообщение диспетчера'),
+        h('div',{className:'msgbox'}, stripMoney(truck.driverMsg||''))):null):null,
+
+    // return cargo
+    bc?h('div',{className:'card',style:{borderLeft:'3px solid #22d3ee'}},
+      h('div',{className:'lbl',style:{color:'#22d3ee'}},'Обратный груз'),
+      bc.cargo?h('div',{className:'row'},'📦 ', h('b',null,bc.cargo)):null,
+      bc.from?h('div',{className:'row'},'📍 Загрузка: ', h('b',null,bc.from)):null,
+      bc.to?h('div',{className:'row'},'🎯 Выгрузка: ', h('b',null,bc.to)):null,
+      bc.departAt?h('div',{className:'row'},'🕐 Отправление: ', h('b',null,fmt(bc.departAt))):null):null,
+
+    // status buttons
+    h('div',{className:'card'},
+      h('div',{className:'lbl'},'Отметить статус'),
+      h('div',{style:{display:'flex',flexDirection:'column',gap:10}},
+        STATUSES.map(function(s){
+          var active = truck.status===s.status;
+          return h('button',{key:s.key,className:'sbtn',disabled:!!sending,onClick:function(){ mark(s); },
+            style:{ background: active? (s.color+'22') : 'var(--bg2)',
+              border:'1px solid '+(active? s.color : 'var(--border2)'),
+              color: active? s.color : 'var(--text)', opacity: sending&&sending!==s.key?0.5:1 }},
+            h('span',{className:'dot',style:{background:s.color}}),
+            h('span',null, s.label),
+            sending===s.key?h('span',{style:{marginLeft:'auto',fontSize:12,color:'var(--text3)'}},'…'):
+              (active?h('span',{style:{marginLeft:'auto',fontSize:12}},'✓'):null));
+        }))),
+
+    (function(){
+      var wa=(cfg&&cfg.groupWa)||'', mx=(cfg&&cfg.groupMax)||'';
+      var vbtn={display:'flex',alignItems:'center',justifyContent:'center',gap:8,width:'100%',padding:'13px',borderRadius:12,fontWeight:800,fontSize:14,cursor:'pointer',fontFamily:'inherit'};
+      return h('div',{className:'card'},
+        h('div',{className:'lbl'},'📹 Видео загрузки / выгрузки'),
+        h('div',{className:'muted',style:{marginBottom:10,lineHeight:1.45}},'Снимите видео загрузки или выгрузки и отправьте в рабочую группу.'),
+        (wa||mx)?h('div',{style:{display:'flex',flexDirection:'column',gap:9}},
+          wa?h('button',{onClick:function(){ window.open(wa,'_blank'); },style:Object.assign({},vbtn,{background:'rgba(37,211,102,.16)',border:'1px solid #25d366',color:'#25d366'})},'📱 Отправить в WhatsApp'):null,
+          mx?h('button',{onClick:function(){ window.open(mx,'_blank'); },style:Object.assign({},vbtn,{background:'rgba(91,141,239,.16)',border:'1px solid #5b8def',color:'#9db8ff'})},'💬 Отправить в MAX'):null)
+        :h('div',{className:'muted'},'Ссылки на группу пока не заданы — попросите диспетчера добавить их.'));
+    })(),
+    h('div',{style:{textAlign:'center',marginTop:4}},
+      h('button',{className:'link',onClick:props.onExit},'← Выйти / другой код'))
+    ),
+
+    toast?h('div',{className:'toast'}, toast):null);
+}
+
+function App(){
+  var ks=useState(null); var truckKey=ks[0], setTruckKey=ks[1];
+  var rs=useState(true); var resolving=rs[0], setResolving=rs[1];
+  useEffect(function(){
+    var pin=null; try{ pin=new URLSearchParams(window.location.search).get('pin'); }catch(e){}
+    if(pin){ dbGet('/trucks').then(function(d){ setTruckKey(findKey(d,pin)); setResolving(false); })
+      .catch(function(){ setResolving(false); }); }
+    else setResolving(false);
+  },[]);
+  if(resolving) return h('div',{className:'center'},'Загрузка…');
+  if(!truckKey) return h(Login,{onFound:setTruckKey});
+  return h(DriverPage,{truckKey:truckKey,onExit:function(){
+    setTruckKey(null);
+    try{ window.history.replaceState(null,'',window.location.pathname); }catch(e){}
+  }});
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
